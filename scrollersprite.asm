@@ -45,7 +45,6 @@
     sta $d020              // Set the border color to black
     sta $d021              // Set the background color to black
 
-
     lda #$00               // reset sine wave pointers
     sta sinreset+1
     sta sinwave+1
@@ -80,7 +79,7 @@
     lda #$1b
     sta $d011
 
-    ldx #<irq              // set pointers to FLD IRQ routine
+    ldx #<irq              // set pointers to IRQ routine
     ldy #>irq
     stx $0314
     sty $0315
@@ -90,7 +89,25 @@
     jmp *
 
 irq:
-    inc $d019
+    inc $d019                  // Acknowledge the IRQ
+
+    lda $d012                  // Check current raster line
+    cmp #$30                   // Line where we want to disable the borders
+    beq near_disable_borders    // Branch to a nearby label
+    jmp skip_disable_borders    // If not equal, jump to skip the disabling
+
+near_disable_borders:
+    jmp disable_borders         // Perform an unconditional jump to the actual disable_borders code
+
+skip_disable_borders:
+    cmp #$f8                   // Line where we want to re-enable the borders
+    beq near_enable_borders     // Branch to a nearby label
+    jmp skip_enable_borders     // If not equal, jump to skip the enabling
+
+near_enable_borders:
+    jmp enable_borders          // Perform an unconditional jump to the actual enable_borders code
+
+skip_enable_borders:
 
     lda scrollpos+1            // X-position of 1st sprite
     sec
@@ -152,7 +169,7 @@ scrollpos:
     adc #SPRITESPACING
     sta $d00a
     bcc !+
-    ldx #%11100000             // take care of MSB
+    ldx #%11100000             // Handle MSB for sprites
     clc
 !:  adc #SPRITESPACING
     sta $d00c
@@ -163,25 +180,45 @@ scrollpos:
     sta $d00e
     bcc !+
     ldx #%10000000
-!:  stx $d010                 // set proper sprite MSB
+!:  stx $d010                 // Set proper sprite MSB
 
 sinreset:
-    ldx #$00                  // sine wave counter
-    stx sinwave+1             // store in sine wave pointer
+    ldx #$00                  // Reset sine wave counter
+    stx sinwave+1             // Store in sine wave pointer
     inc sinreset+1
     ldy #$00
 sinwave:
-    lda sindata               // read sine wave data
-    sta $d001,y               // store in Y-coords sprites
+    lda sindata               // Read sine wave data
+    sta $d001,y               // Store in Y-coords of sprites
     lda sinwave+1
     clc
-    adc #SINLEAP              // to make wave more interesting
-    sta sinwave+1             // increase sine wave pointer by SINLEAP
+    adc #SINLEAP              // Make wave more interesting
+    sta sinwave+1             // Increase sine wave pointer by SINLEAP
     iny
     iny
-    cpy #$10                  // next sprites
+    cpy #$10                  // Next sprites
     bne sinwave
-    jmp $ea31                 // end of IRQ1
+    jmp $ea31                 // End of IRQ
+
+disable_borders:
+    lda $d011                  // Disable top/bottom borders
+    and #%11110111             // Clear bit 4 of $d011
+    sta $d011
+
+    lda $d016                  // Disable side borders
+    ora #%00001000             // Set bit 3 of $d016
+    sta $d016
+    jmp $ea31                  // Exit the interrupt
+
+enable_borders:
+    lda $d011                  // Re-enable top/bottom borders
+    ora #%00001000             // Set bit 4 of $d011
+    sta $d011
+
+    lda $d016                  // Re-enable side borders
+    and #%11110111             // Clear bit 3 of $d016
+    sta $d016
+    jmp $ea31                  // Exit the interrupt
 
 .align $100
 sindata:
