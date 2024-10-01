@@ -1,250 +1,302 @@
 // Made in Kick Assembler
-
+/*
+Judges
+Load Address
+$1000
+Init Address
+$1B24
+Play Address
+$1B3A
+*/
 .macro SetBorderColor(color) {
-	lda #color
-	sta $d020
+	lda #color              // Load the border color into accumulator
+	sta $d020               // Store the value in border color register $d020
 }
 
 .macro SetBackgroundColor(color) {
-	lda #color
-	sta $d021
+	lda #color              // Load the background color into accumulator
+	sta $d021               // Store the value in background color register $d021
 }
 
 .macro SetBgAndBorderColor(bgColor, borderColor) {
-    SetBackgroundColor(bgColor)
-    SetBorderColor(borderColor)
+    SetBackgroundColor(bgColor)  // Call macro to set background color
+    SetBorderColor(borderColor)  // Call macro to set border color
 }
 
 .macro SetMultiColor1(color) {
-	lda #color
-	sta $d022
+	lda #color              // Load multicolor 1 color value into accumulator
+	sta $d022               // Store in multicolor 1 register ($d022)
 }
 
 .macro SetMultiColor2(color) {
-	lda #color
-	sta $d023
+	lda #color              // Load multicolor 2 color value into accumulator
+	sta $d023               // Store in multicolor 2 register ($d023)
 }
 
 .macro SetMultiColor3(color) {
-    lda #color
-    sta $d024
+    lda #color              // Load multicolor 3 color value into accumulator
+    sta $d024               // Store in multicolor 3 register ($d024)
 }
 
 .macro SetMultiColor4(color) {
-    lda #color
-    sta $d025
+    lda #color              // Load multicolor 4 color value into accumulator
+    sta $d025               // Store in multicolor 4 register ($d025)
 }
 
 .macro SetMultiColor5(color) {
-    lda #color
-    sta $d026
+    lda #color              // Load multicolor 5 color value into accumulator
+    sta $d026               // Store in multicolor 5 register ($d026)
 }
 
 .macro SetMultiColorMode() {
-	lda	$d016
-	ora	#16 // New: 00010110 Default: $C8, %11001000.
-	sta	$d016
+	lda	$d016               // Load the control register $d016 into accumulator
+	ora	#16                 // Enable multicolor mode by OR-ing with 16
+	sta	$d016               // Store the modified value back into $d016
 }
 
-.label spriteMemory = $2000
+.var music = LoadSid("Crazy_Sample_II_intro.sid")   // Load the SID music file
 
-* = spriteMemory // spriteMemory is where you want your sprites
+.label spriteMemory = $2000    // Label for sprite memory, starts at $2000
 
-.var bgColor = $00
-.var firstColor = $04
-.var secondColor = $02
-.var thirdColor = $01
-// Load the GIF with the sprite font, each letter in a 64x21 grid (24px x 42px is the actual size of each letter)
+* = spriteMemory              // Set the memory pointer to spriteMemory ($2000)
+
+.var bgColor = $00            // Define a variable for background color
+.var firstColor = $04         // Define a variable for the first sprite color
+.var secondColor = $02        // Define a variable for the second sprite color
+.var thirdColor = $01         // Define a variable for the third sprite color
+
+// Load the GIF with the sprite font, each letter in a 64x21 grid
+// Actual size of each letter is 24x42 pixels
 .var spriteFont = LoadPicture("fontgrip1234567.gif", List().add($000000, $cc44cc, $ffffff, $00cc55))
 
-// Create a List() that contains the letters in your font
+// Create a List() that contains the letters in the font
 //  in the order as they appear in the GIF
 .var fontMap = List()
 
 // Define sprite width and height
-.var spriteWidth = 24
-.var spriteHeight = 21
+.var spriteWidth = 24         // Sprite width of 24 pixels
+.var spriteHeight = 21        // Sprite height of 21 pixels
 
-// Parse the strings (var l = lines) in the fontMap List()
-.eval fontMap.add("abcdefghijklmnopqrstuvwxyz,.!?:-")	// content of line (32 letters)
-.eval fontMap.add(@"abcdefghijklmnopqrstuvwxyz,.!?:-")	// content of line (32 letters)
-.print toIntString(spriteFont.width) + "x" + toIntString(spriteFont.height) + "px"	// print width and height of the font
+// Add character sets (lines) to fontMap
+.eval fontMap.add("abcdefghijklmnopqrstuvwxyz,.!?:-")    // First line of characters
+.eval fontMap.add(@"abcdefghijklmnopqrstuvwxyz,.!?:-")   // Second line of characters
 
-.for (var l=0; l<fontMap.size(); l++){		// loop through lines
-.for (var p=0; p<fontMap.get(l).size(); p++){	// loop through letters
+// Print the width and height of the sprite font image
+.print toIntString(spriteFont.width) + "x" + toIntString(spriteFont.height) + "px"
+
+.for (var l=0; l<fontMap.size(); l++){    // Loop through each line of the fontMap
+.for (var p=0; p<fontMap.get(l).size(); p++){  // Loop through each character in the line
 
     // sprite
     // a 0, b 1, c 2
     // a (0, 64), b (128, 192), c (256, 320)
-    .var address = (p * 128) + (l * 64)	// determine memory location
-    .print "p:" + toIntString(p) + " " + fontMap.get(l).charAt(p) + ", l:" + toIntString(l) + ", address:" + toIntString(address) + ", x: " + toIntString((p*3)+mod(1,3)) + ", y:" + toIntString(l*21+floor(1/3))
-    * = spriteMemory + address
+    .var address = (p * 128) + (l * 64)    // Calculate the memory address for the sprite
+    .print "p:" + toIntString(p) + " " + fontMap.get(l).charAt(p) + ", l:" + toIntString(l) + ", address:" + toIntString(address)
+    * = spriteMemory + address             // Set the memory pointer to the sprite's address
 
     .fill 63, spriteFont.getMulticolorByte((p*3)+mod(i,3), l*21+floor(i/3))
+    // Fill the memory with the sprite data from the font image
 }
 }
-.print "Sprite memory: " + toHexString(spriteMemory)
-    .const SPRITESPACING   = 43    // minimal possible spacing
-    .const SINLEAP         = 20    // choose anything here to change sine wave
-    .const SCROLLSPEED     = 4     // lower value is slower
-    .const SPRITEPOINTER   = $07f8
+.print "Sprite memory: " + toHexString(spriteMemory)  // Print the sprite memory address
 
-*=$0801
-    BasicUpstart($0810)
+.const SPRITESPACING   = 43    // Set the minimal possible spacing between sprites
+.const SINLEAP         = 20    // Define the leap for sine wave calculation
+.const SCROLLSPEED     = 4     // Define the scroll speed (lower value = slower)
+.const SPRITEPOINTER   = $07f8 // Pointer to the sprite data
 
-*=$0810
-    sei
-    jsr $e544              // KERNAL: clear screen
+*=$0801                      // Set the memory pointer to $0801 (BASIC start address)
+    BasicUpstart($0810)       // Initialize BASIC upstart routine at $0810
 
-    SetBgAndBorderColor(bgColor, bgColor)
+*=$0810                      // Set the memory pointer to $0810 (start of code)
+    sei                       // Disable interrupts
+    jsr $e544                 // Jump to KERNAL clear screen routine
 
-    lda #$00               // reset sine wave pointers
-    sta sinreset+1
-    sta sinwave+1
+    SetBgAndBorderColor(bgColor, bgColor)   // Set the background and border colors
 
-    ldx #<scrolltext       // reset scroll text pointer
-    ldy #>scrolltext
-    stx textpointer+1
-    sty textpointer+2
+    lda #$00                  // Load 0 into accumulator (reset sine wave pointers)
+    sta sinreset+1            // Store in sinreset pointer
+    sta sinwave+1             // Store in sinwave pointer
 
-    lda #$ff            // bits of sprite 0-7
-    sta $d015           // turn on all sprites
-    lda $d01c
-    ora #%11111111     // Set all sprites multicolor
-    sta $d01c
-    SetMultiColorMode()
-    SetMultiColor4(firstColor)
-    SetMultiColor5(secondColor)
+    ldx #<scrolltext          // Load low byte of scroll text pointer into X
+    ldy #>scrolltext          // Load high byte of scroll text pointer into Y
+    stx textpointer+1         // Store low byte in textpointer+1
+    sty textpointer+2         // Store high byte in textpointer+2
 
-    ldx #$00
-!:  lda #$a0               // init with spaces in all sprite pointers
-    sta SPRITEPOINTER,x
-    lda #thirdColor
-    sta $d027,x            // set sprite colours
-    inx
-    cpx #$08
-    bne !-
+    lda #$ff                  // Load $ff (all bits on) into accumulator
+    sta $d015                 // Enable all sprites (write to sprite enable register)
+    lda $d01c                 // Load sprite multicolor enable register
+    ora #%11111111            // Enable multicolor for all sprites
+    sta $d01c                 // Store back in $d01c register
+    SetMultiColorMode()       // Enable multicolor mode
+    SetMultiColor4(firstColor)  // Set first sprite color
+    SetMultiColor5(secondColor) // Set second sprite color
+    lda #$00                  // Load 0 into accumulator
+    tax                       // Transfer 0 to X register
+    tay                       // Transfer 0 to Y register
+    lda #music.startSong-1    // Load the startSong-1 address into accumulator
+    jsr music.init            // Initialize music routine at $1B24
 
-    lda #$01               // init IRQ
-    sta $d01a
-    lda #$7f
-    sta $dc0d
-    sta $dd0d
-    lda $dc0d
-    lda $dd0d
+    ldx #$00                  // Load 0 into X register (for initialization)
+!:  lda #$a0                  // Load $a0 (space character) into accumulator
+    sta SPRITEPOINTER,x       // Store in sprite pointer memory
+    lda #thirdColor           // Load third sprite color into accumulator
+    sta $d027,x               // Store in sprite color register
+    inx                       // Increment X register
+    cpx #$08                  // Compare X with 8 (number of sprites)
+    bne !-                    // If not equal, repeat the loop
 
-    lda #$32               // arbitrary value
-    sta $d012
-    lda #$1b
-    sta $d011
+    lda #$01                  // Load $01 (initialize IRQ) into accumulator
+    sta $d01a                 // Store in interrupt control register
+    lda #$7f                  // Load $7f into accumulator
+    sta $dc0d                 // Enable CIA1 interrupt control register
+    sta $dd0d                 // Enable CIA2 interrupt control register
+    lda $dc0d                 // Read from CIA1 interrupt control register
+    lda $dd0d                 // Read from CIA2 interrupt control register
 
-    ldx #<irq              // set pointers to IRQ routine
-    ldy #>irq
-    stx $0314
-    sty $0315
+    lda #$32                  // Load arbitrary value $32 into accumulator
+    sta $d012                 // Store in raster compare register
+    lda #$1b                  // Load $1b into accumulator
+    sta $d011                 // Store in vertical scroll and display control register
 
-    cli
+    ldx #<irq                 // Load low byte of IRQ address into X register
+    ldy #>irq                 // Load high byte of IRQ address into Y register
+    stx $0314                 // Store low byte in IRQ vector
+    sty $0315                 // Store high byte in IRQ vector
 
-    jmp *
+    cli                       // Enable interrupts
+
+    jmp *                     // Jump to current address, infinite loop
 
 irq:
-    inc $d019
+    inc $d019                 // Acknowledge interrupt
+    inc $d020                 // increment background color
+    jsr music.play            // Play music
+    dec $d020                 // decrement background color
 
-    lda scrollpos+1            // X-position of 1st sprite
-    sec
-    sbc #SCROLLSPEED           // decrease with SCROLLSPEED
-    bpl notext                 // skip text fetch if sprite 1 can still move left
+    lda scrollpos+1           // Load X-position of the first sprite
+    sec                       // Set carry flag (for subtraction)
+    sbc #SCROLLSPEED          // Subtract scroll speed from X-position
+    bpl notext                // If position is positive, skip text fetch
 
-        ldx #$00               // shift content of sprites pointers
+    ldx #$00              // Initialize X to 0 (start of sprite pointers shift)
     scrollpointers:
-        lda SPRITEPOINTER+1,x
-        sta SPRITEPOINTER,x
-        inx
-        cpx #$07
-        bne scrollpointers
-        lda sinreset+1         // shift sine wave
-        clc
-        adc SINLEAP            // this fixes sine offset
-        adc #$03               // when resetting sprite position
-        sta sinreset+1
-    textpointer:
-        lda scrolltext         // get next letter from scroll text
-        bne noreset            // if not #$00 (end indicator)
+        lda SPRITEPOINTER+1,x // Load sprite pointer
+        sta SPRITEPOINTER,x   // Store in previous sprite pointer
+        inx                   // Increment X
+        cpx #$07              // Compare X with 7 (number of sprites)
+        bne scrollpointers    // Repeat if not equal
 
-        lda #<scrolltext       // reset scroll text pointer when letter is $00
-        sta textpointer+1
-        lda #>scrolltext
-        sta textpointer+2
-        jmp textpointer        // read new letter
+        lda sinreset+1        // Load sine wave reset value
+        clc                   // Clear carry flag (for addition)
+        adc SINLEAP           // Add sine leap to the value
+        adc #$03              // Additional adjustment
+        sta sinreset+1        // Store new value in sine wave reset
+
+    textpointer:
+        lda scrolltext        // Load next letter from scroll text
+        bne noreset           // If not 0 (end indicator), skip reset
+
+        lda #<scrolltext      // Reset scroll text pointer
+        sta textpointer+1     // Store low byte
+        lda #>scrolltext      // Load high byte
+        sta textpointer+2     // Store high byte
+        jmp textpointer       // Jump to textpointer for new letter
 
     noreset:
         clc
-        adc #(>spriteMemory<<2) // correct for location of sprite font
-        sta SPRITEPOINTER+7     // store new letter in sprite 8 pointer
+        adc #(>spriteMemory<<2) // Correct for location of sprite font
+        sta SPRITEPOINTER+7     // Store new letter in sprite pointer
 
-        inc textpointer+1      // increase scroll text pointer
-        bne !+
-        inc textpointer+2
+        inc textpointer+1     // Increment text pointer low byte
+        bne !+                // If no carry, continue
+        inc textpointer+2     // Otherwise, increment high byte
     !:
-        lda #SPRITESPACING     // move sprite 1 to right most position
+        lda #SPRITESPACING    // Load sprite spacing into accumulator
 notext:
-    sta scrollpos+1
+    sta scrollpos+1           // Store in X-position of first sprite
 
-    ldx #$00                   // position other sprites relative to sprite 1
+    ldx #$00                  // Load 0 into X register (for sprite positioning)
 scrollpos:
-    lda #$18                   // set new X-coord for all sprites
-    sta $d000
+    lda #$18                  // Load X-coordinate for first sprite
+    sta $d000                 // Store in first sprite X-position register
+    clc                       // Clear carry flag
+    adc #SPRITESPACING        // Add sprite spacing
+    sta $d002                 // Store in second sprite X-position register
     clc
-    adc #SPRITESPACING
-    sta $d002
+    adc #SPRITESPACING        // Add sprite spacing
+    sta $d004                 // Store in third sprite X-position register
     clc
-    adc #SPRITESPACING
-    sta $d004
+    adc #SPRITESPACING        // Add sprite spacing
+    sta $d006                 // Store in fourth sprite X-position register
     clc
-    adc #SPRITESPACING
-    sta $d006
+    adc #SPRITESPACING        // Add sprite spacing
+    sta $d008                 // Store in fifth sprite X-position register
     clc
-    adc #SPRITESPACING
-    sta $d008
+    adc #SPRITESPACING        // Add sprite spacing
+    sta $d00a                 // Store in sixth sprite X-position register
+    bcc !+                    // Branch if carry clear
+    ldx #%11100000            // Load most significant bits for sprite X-positions
     clc
-    adc #SPRITESPACING
-    sta $d00a
-    bcc !+
-    ldx #%11100000             // take care of MSB
+!:  adc #SPRITESPACING        // Add sprite spacing
+    sta $d00c                 // Store in seventh sprite X-position register
+    bcc !+                    // Branch if carry clear
+    ldx #%11000000            // Load most significant bits for sprite X-positions
     clc
-!:  adc #SPRITESPACING
-    sta $d00c
-    bcc !+
-    ldx #%11000000
-    clc
-!:  adc #SPRITESPACING
-    sta $d00e
-    bcc !+
-    ldx #%10000000
-!:  stx $d010                 // set proper sprite MSB
+!:  adc #SPRITESPACING        // Add sprite spacing
+    sta $d00e                 // Store in eighth sprite X-position register
+    bcc !+                    // Branch if carry clear
+    ldx #%10000000            // Load most significant bits for sprite X-positions
+!:  stx $d010                 // Store the MSB for all sprites
 
 sinreset:
-    ldx #$00                  // sine wave counter
-    stx sinwave+1             // store in sine wave pointer
-    inc sinreset+1
-    ldy #$00
+    ldx #$00                  // Initialize sine wave counter to 0
+    stx sinwave+1             // Store in sine wave pointer
+    inc sinreset+1            // Increment sine wave reset pointer
+    ldy #$00                  // Initialize Y register to 0
 sinwave:
-    lda sindata               // read sine wave data
-    sta $d001,y               // store in Y-coords sprites
-    lda sinwave+1
-    clc
-    adc #SINLEAP              // to make wave more interesting
-    sta sinwave+1             // increase sine wave pointer by SINLEAP
+    lda sindata               // Load sine wave data
+    sta $d001,y               // Store in Y-coordinate of sprites
+    lda sinwave+1             // Load current sine wave position
+    clc                       // Clear carry flag
+    adc #SINLEAP              // Add SINLEAP to make the wave more interesting
+    sta sinwave+1             // Store new sine wave position
+    iny                       // Increment Y register (move to next sprite)
     iny
-    iny
-    cpy #$10                  // next sprites
-    bne sinwave
-    jmp $ea31                 // end of IRQ1
+    cpy #$10                  // Compare with 16 (number of sprites)
+    bne sinwave               // Repeat if not all sprites are processed
+    jmp $ea31                 // End of IRQ, jump back to main program
 
 .align $100
 sindata:
-    .fill 256, 120 + 15.5*sin(toRadians(i*(3*360)/256))
+    .fill 256, 120 + 15.5*sin(toRadians(i*(3*360)/256))   // Fill with sine wave data
 
 scrolltext:
-    .text "a a a a a a a b b b b b b b cdefghijklmnopqrstuvwxyz,.!?:-"
-    .byte $00
+    .text "a a a a a a a b b b b b b b cdefghijklmnopqrstuvwxyz,.!?:-"  // Define scroll text
+    .byte $00                // End of text
+
+*=music.location "Music"
+.fill music.size, music.getData(i)
+// Print the music info while assembling
+.print ""
+.print "SID Data"
+.print "--------"
+.print "location=$"+toHexString(music.location)
+.print "init=$"+toHexString(music.init)
+.print "play=$"+toHexString(music.play)
+.print "songs="+music.songs
+.print "startSong="+music.startSong
+.print "size=$"+toHexString(music.size)
+.print "name="+music.name
+.print "author="+music.author
+.print "copyright="+music.copyright
+
+.print ""
+.print "Additional tech data"
+.print "--------------------"
+.print "header="+music.header
+.print "header version="+music.version
+.print "flags="+toBinaryString(music.flags)
+.print "speed="+toBinaryString(music.speed)
+.print "startpage="+music.startpage
+.print "pagelength="+music.pagelength
