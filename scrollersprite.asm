@@ -79,7 +79,7 @@ $1B3A
 
 // Add character sets (lines) to fontMap
 .eval fontMap.add("abcdefghijklmnopqrstuvwxyz,.!?:-")    // First line of characters
-.eval fontMap.add(@"abcdefghijklmnopqrstuvwxyz,.!?:-")   // Second line of characters
+.eval fontMap.add("abcdefghijklmnopqrstuvwxyz,.!?:-")   // Second line of characters
 
 // Print the width and height of the sprite font image
 .print toIntString(spriteFont.width) + "x" + toIntString(spriteFont.height) + "px"
@@ -109,6 +109,12 @@ $1B3A
     BasicUpstart($0810)       // Initialize BASIC upstart routine at $0810
 
 *=$0810                      // Set the memory pointer to $0810 (start of code)
+
+    .print "Sprite pointer for first sprite: $" + toHexString(SPRITEPOINTER)
+    .print "Sprite pointer for second sprite: $" + toHexString(SPRITEPOINTER+2)
+    .print scrolltext
+    .print textpointer
+    .print textpointer+1
     sei                       // Disable interrupts
     jsr $e544                 // Jump to KERNAL clear screen routine
 
@@ -194,16 +200,16 @@ irq:
         sta sinreset+1        // Store new value in sine wave reset
 
     textpointer:
-        lda scrolltext        // Load next letter from scroll text
+        lda scrolltext        // Load next letter from scroll text which is in dec
         bne noreset           // If not 0 (end indicator), skip reset
 
-        lda #<scrolltext      // Reset scroll text pointer
+        lda #<scrolltext      // Reset scroll text pointer 
         sta textpointer+1     // Store low byte
         lda #>scrolltext      // Load high byte
         sta textpointer+2     // Store high byte
         jmp textpointer       // Jump to textpointer for new letter
 
-    noreset:
+noreset:
         clc
         adc #(>spriteMemory<<2) // Correct for location of sprite font
         sta SPRITEPOINTER+7     // Store new letter in sprite pointer
@@ -221,19 +227,16 @@ scrollpos:
     lda #$18                  // Load X-coordinate for first sprite
     sta $d000                 // Store in first sprite X-position register
     clc                       // Clear carry flag
-    adc #SPRITESPACING        // Add sprite spacing
     sta $d002                 // Store in second sprite X-position register
     clc
     adc #SPRITESPACING        // Add sprite spacing
     sta $d004                 // Store in third sprite X-position register
     clc
-    adc #SPRITESPACING        // Add sprite spacing
     sta $d006                 // Store in fourth sprite X-position register
     clc
     adc #SPRITESPACING        // Add sprite spacing
     sta $d008                 // Store in fifth sprite X-position register
     clc
-    adc #SPRITESPACING        // Add sprite spacing
     sta $d00a                 // Store in sixth sprite X-position register
     bcc !+                    // Branch if carry clear
     ldx #%11100000            // Load most significant bits for sprite X-positions
@@ -272,8 +275,15 @@ sindata:
     .fill 256, 120 + 15.5*sin(toRadians(i*(3*360)/256))   // Fill with sine wave data
 
 scrolltext:
-    .text "a a a a a a a b b b b b b b cdefghijklmnopqrstuvwxyz,.!?:-"  // Define scroll text
+    .text "a a a a a a a a a aa aaaaaaaaa b b b b b b b cdefghijklmnopqrstuvwxyz,.!?:-"  // Define scroll text
     .byte $00                // End of text
+
+spriteAddressTable:
+    .word $2000, $2100, $2200, $2300, $2400, $2500, $2600, $2700  // Addresses for 'A' to 'H'
+    .word $2800, $2900, $2A00, $2B00, $2C00, $2D00, $2E00, $2F00  // Addresses for 'I' to 'P'
+    .word $3000, $3100, $3200, $3300, $3400, $3500, $3600, $3700  //Addresses for 'Q' to 'X'
+    .word $3800, $3900, $3A00, $3B00, $3C00, $3D00, $3E00, $3F00  //Addresses for 'Y' to special characters
+
 
 *=music.location "Music"
 .fill music.size, music.getData(i)
