@@ -54,11 +54,11 @@ $1B3A
 	sta	$d016               // Store the modified value back into $d016
 }
 
-.var music = LoadSid("Crazy_Sample_II_intro.sid")   // Load the SID music file
+.var music = LoadSid("Zoo_Makiaksi_v117.sid")   // Load the SID music file
 
-.label spriteMemory = $2000    // Label for sprite memory, starts at $2000
+.label spriteMemory = $2268    // Label for sprite memory, starts at $2268
 
-* = spriteMemory              // Set the memory pointer to spriteMemory ($2000)
+* = spriteMemory              // Set the memory pointer to spriteMemory ($2268)
 
 .var bgColor = $00            // Define a variable for background color
 .var firstColor = $04         // Define a variable for the first sprite color
@@ -175,7 +175,7 @@ $1B3A
     jmp *                     // Jump to current address, infinite loop
 
 irq:
-    inc $d019                 // Acknowledge interrupt
+    asl $d019                 // Acknowledge interrupt
     inc $d020                 // increment background color
     jsr music.play            // Play music
     dec $d020                 // decrement background color
