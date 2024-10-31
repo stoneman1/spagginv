@@ -1,43 +1,132 @@
 // Made in Kick Assembler
 .label spriteMemory = $3000
-
 * = spriteMemory // spriteMemory is where you want your sprites
 
 // Load the GIF with the sprite font, each letter in a 64x21 grid
 .var spriteFont = LoadPicture("fontt1pil.gif",List().add($ffffff,$000000))
 .var music = LoadSid("zoomakiaksi.sid")
-// Create a List() that contains the letters in your font
-//  in the order as they appear in the GIF
-.var fontMap = List()
 
-// Add strings that contains all the letters for each line in the GIF
-.eval fontMap.add("abcdefghijklmnopqrstuvwxyz")	// content of 1st line
-.eval fontMap.add(@"0123456789\$27-+?!,.")	// content of 2nd line
-                                                // (@ indicates escape code)
+.var line1 = "abcdefghijklmnopqrstuvwxyz"
+.var line2 = @"0123456789\$27-+?!,."
 
-// Parse the strings (var l = lines) in the fontMap List()
-.for (var l=0; l<fontMap.size(); l++){		// loop through lines
+// Calculate base addresses for each line
+.var line1_base = spriteMemory          // First line starts at $3000
+.var line2_base = spriteMemory + $c00   // Second line starts at $3c00
 
-// Parse each string (var p = position)
-.for (var p=0; p<fontMap.get(l).size(); p++){	// loop through letters
+// Parse line 1 (lowercase letters)
+.for (var p=0; p<line1.size(); p++) {
+    * = line1_base + (p*64) "Sprite"
+    .print "p: " + p 
+    .print "Mem: " + toHexString(*) 
+    .print "char: " + line1.charAt(p)
+    .fill 63, spriteFont.getSinglecolorByte((p*3)+mod(p,3), 0+floor(p/3))
+}
 
-// The location in memory is determined by the value of the letter
-* = spriteMemory + fontMap.get(l).charAt(p)*64 "Sprite" // determine memory location
-    .print "perus: " + fontMap.get(l).charAt(p)
-    .print "64: " + fontMap.get(l).charAt(p)*64
-    .print "p: " + p
-
-// Transfer the graphics in the GIF to the sprite
-.fill 63, spriteFont.getSinglecolorByte((p*3)+mod(i,3), l*21+floor(i/3))
-
-} // for-loop p
-} // for-loop l
+// Parse line 2 (numbers and symbols)
+.for (var p=0; p<line2.size(); p++) {
+    * = line2_base + (p*64) "Sprite"
+    .print "p: " + p 
+    .print "Mem: " + toHexString(*) 
+    .print "char: " + line2.charAt(p)
+    .fill 63, spriteFont.getSinglecolorByte((p*3)+mod(p,3), 1+floor(p/3))
+}
     .const SPRITESPACING   = 43    // minimal possible spacing
     .const SINLEAP         = 20    // choose anything here to change sine wave
-    .const SCROLLSPEED     = 4     // lower value is slower
-    .const SPRITEPOINTER   = $07f9
-    .const PILLIPOINTER = $07f8
-    .const PILLIMEMORY = spriteMemory + fontMap.get(1).charAt(12)*64 
+    .const SCROLLSPEED     = 2     // lower value is slower
+    .const SPRITEPOINTER   = $07fa
+    .const PILLIPOINTER = $07f9
+    .const PILLIMEMORY = $3000
+
+
+
+/// Create lookup table as a List
+.var lookupList = List()
+
+// Space and early special chars ($20-$2F)
+.eval lookupList.add($40)        // $20 Space
+.eval lookupList.add($e1)        // $21 ! 
+.eval lookupList.add($40)        // $22 "
+.eval lookupList.add($40)        // $23 #
+.eval lookupList.add($40)        // $24 $
+.eval lookupList.add($40)        // $25 %
+.eval lookupList.add($40)        // $26 &
+.eval lookupList.add($40)        // $27 ' 
+.eval lookupList.add($40)        // $28 (
+.eval lookupList.add($40)        // $29 )
+.eval lookupList.add($40)        // $2a *
+.eval lookupList.add($eb)        // $2b + 
+.eval lookupList.add($ec)        // $2c , 
+.eval lookupList.add($ed)        // $2d - 
+.eval lookupList.add($ee)        // $2e .
+.eval lookupList.add($40)        // $2f /
+
+// Numbers ($30-$39)
+.for(var i=0; i<10; i++) {
+    .eval lookupList.add($f0+i)  // 0-9 unchanged
+}
+
+// Special chars ($3A-$3F)
+.eval lookupList.add($40)        // $3a :
+.eval lookupList.add($40)        // $3b ;
+.eval lookupList.add($40)        // $3c <
+.eval lookupList.add($40)        // $3d =
+.eval lookupList.add($40)        // $3e >
+.eval lookupList.add($ff)        // $3f ? - corrected to $ff
+
+// @ and uppercase A-Z ($40-$5A)
+.eval lookupList.add($40)        // @
+.for(var i=0; i<26; i++) {
+    .eval lookupList.add($40)    // A-Z
+}
+
+// More special chars ($5B-$60)
+.for(var i=0; i<6; i++) {
+    .eval lookupList.add($40)
+}
+
+// Lowercase a-z ($61-$7A)
+.for(var i=0; i<26; i++) {
+    .eval lookupList.add($c1+i)  // a-z unchanged
+}
+
+
+// Convert List to actual lookup table
+sprite_lookup:
+.for(var i=0; i<lookupList.size(); i++) {
+    .byte lookupList.get(i)
+}
+.print ""
+.print "Memory layout for line 1 (letters):"
+.for (var p=0; p<line1.size(); p++) {
+    .var char = line1.charAt(p)
+    .var mem = spriteMemory + (p*64)
+    .var ptr = mem/64
+    .print "Character: '" + char + "' ASCII: $" + toHexString(char) + " at memory: $" + toHexString(mem) + " -> sprite pointer: $" + toHexString(ptr)
+}
+
+.print ""
+.print "Memory layout for line 2 (numbers & symbols):"
+.for (var p=0; p<line2.size(); p++) {
+    .var char = line2.charAt(p)
+    .var mem = spriteMemory + $c00 + (p*64)
+    .var ptr = mem/64
+    .print "Character: '" + char + "' ASCII: $" + toHexString(char) + " at memory: $" + toHexString(mem) + " -> sprite pointer: $" + toHexString(ptr)
+}
+
+.label textpointer_lo = $fb    // Zero page locations for text pointer
+.label textpointer_hi = $fc
+scrollpos: .byte 0             // Current scroll position
+sinpos:    .byte 0             // Current sine position
+
+    // for precalculating 
+    .const BASE_Y = -50
+    .const AMPLITUDE = 15.5
+    .const SINE_STEPS = 256
+
+    .var rasterLinesList = List()
+    .for(var i=0; i<SINE_STEPS; i++) {
+        .eval rasterLinesList.add(BASE_Y + AMPLITUDE*sin(toRadians(i*(3*360)/256)))
+    }
 
 *=$0801
     BasicUpstart($0810)
@@ -47,175 +136,254 @@
     jsr $e544              // KERNAL: clear screen
 
     lda #$00               // Set border and background to black
-    sta $d020              // Set the border color to black
-    sta $d021              // Set the background color to black
+    sta $d020              
+    sta $d021              
 
-
-    lda #$00               // reset sine wave pointers
-    sta sinreset+1
-    sta sinwave+1
-
-    ldx #<scrolltext       // reset scroll text pointer
-    ldy #>scrolltext
-    stx textpointer+1
-    sty textpointer+2
-
-    lda #$ff
-    sta $d015              // turn on all sprites
-
-    // Pillihomz
-    lda #(>PILLIMEMORY<<2)       // Load the high byte of PILLIMEMORY
-    sta PILLIPOINTER        // Store it at PILLIPOINTER
-    lda #$04
-    sta $d027
-    lda #$10
-    sta $d000
-    lda #$00
-    sta $d001
-
-    // MUSIX
-    lda #$00                  // Load 0 into accumulator
-    tax                       // Transfer 0 to X register
-    tay                       // Transfer 0 to Y register
-    lda #music.startSong-1    // Load the startSong-1 address into accumulator
-    jsr music.init            // Initialize music routine at $1B24
-
+    lda #<scrolltext         // Initialize text pointer
+    sta textpointer_lo
+    lda #>scrolltext
+    sta textpointer_hi
 
     ldx #$00
-!:  lda #$a0               // init with spaces in all sprite pointers
-    sta SPRITEPOINTER,x
-    lda #$01               // color
-    sta $d028,x            // set sprite colours
+!:  lda #$a0                    // Spaceeee
+    sta SPRITEPOINTER,x         // Initialize sprites 2-5 ($07fa-$07fd)
+    lda #$01                    // White color
+    sta $d029,x                 // Colors for sprites 2-5
     inx
-    cpx #$07
+    cpx #$04                    // Four sprites
     bne !-
+
+    // MUSIX init
+    lda #$00              
+    tax                    
+    tay                    
+    lda #music.startSong-1 
+    jsr music.init        
+
+    // Pillihomz (sprite 1)
+    lda #(>PILLIMEMORY<<2)       
+    sta PILLIPOINTER            // $07f9 (sprite 1)
+    lda #$04                    // Purple color
+    sta $d028                   // Sprite 1 color
+    lda #$10
+    sta $d002                   // X position for sprite 1
+    lda #$50
+    sta $d003                   // Y position for sprite 1        
+
+    lda #$fe                // Enable all the rest expect 0 sprite
+    sta $d015    
 
     lda #$01               // init IRQ
     sta $d01a
-    lda #$7f
+    lda #$7f               // Disable CIA interrupts
     sta $dc0d
     sta $dd0d
     lda $dc0d
     lda $dd0d
 
-    lda #30
+    lda #$35               // Bank out KERNAL and BASIC
+    sta $01                // Only if you don't need KERNAL functions anymore
+    
+    lda #50                // Set initial raster line
     sta $d012
-    lda #$1b //00011011
+    lda #$1b              // High bit clear
     sta $d011
 
-    ldx #<irq              // set pointers to FLD IRQ routine
-    ldy #>irq
-    stx $0314
-    sty $0315
+    ldx #<irq1            // Set up first IRQ vector
+    ldy #>irq1
+    stx $fffe             // Use hardware vectors instead of KERNAL
+    sty $ffff
 
     cli
-
     jmp *
 
-irq:
-    asl $d019
+.align $100
+rasterlines:
+    .for(var i=0; i<SINE_STEPS; i++) {
+        .byte rasterLinesList.get(i)
+    }
 
-    jsr music.play            // Play music
+irq1:   
+        sta saveA+1           
+        stx saveX+1
+        sty saveY+1
 
-             //Fine-tune with cycle-exact instructions
-    nop                     // Adjust timing to get precise alignment
-    nop
-    lda #$01
-    sta $d017               // Enable sideborder opening with X-expansion
-    lda scrollpos+1            // X-position of 1st sprite
+        lda $d012
+!:      cmp $d012
+        beq !-
+!:      lda $d012
+        ldx sinreset+1        
+        lda $20     
+        cmp $d012
+        bne !-
+
+        ldx #$08              
+!:      dex
+        bne !-
+        bit $ea
+        nop
+        nop
+
+        dec $d016             
+        nop
+        nop
+        nop
+        inc $d016             
+
+        jsr handle_scroll     // First handle scroll
+        jsr update_sine      // Then update positions
+        jsr music.play       // Then music
+
+        asl $d019            
+
+saveA:  lda #$00             
+saveX:  ldx #$00
+saveY:  ldy #$00
+        rti
+
+handle_scroll:
+    lda scrollpos       
     sec
-    sbc #SCROLLSPEED           // decrease with SCROLLSPEED
-    bpl notext                 // skip text fetch if sprite 2 can still move left
+    sbc #SCROLLSPEED      
+    bpl no_update         
 
-        ldx #$00               // shift content of sprites pointers
-    scrollpointers:
-        lda SPRITEPOINTER+1,x
-        sta SPRITEPOINTER,x
-        inx
-        cpx #$06
-        bne scrollpointers
-        
-        lda sinreset+1         // shift sine wave
-        clc
-        adc SINLEAP            // this fixes sine offset
-        adc #$03               // when resetting sprite position
-        sta sinreset+1
-    textpointer:
-        lda scrolltext         // get next letter from scroll text
-        bne noreset            // if not #$00 (end indicator)
+    // Move sprite pointers left $07fa
+    lda $07fb              
+    sta $07fa              
+    lda $07fc              
+    sta $07fb              
+    lda $07fd              
+    sta $07fc              
 
-        lda #<scrolltext       // reset scroll text pointer when letter is $00
-        sta textpointer+1
-        lda #>scrolltext
-        sta textpointer+2
-        jmp textpointer        // read new letter
+    // Get new character and handle text wrapping
+    ldy #0
+    lda (textpointer_lo),y   
+    bne !+
+    // Reset text if at end
+    lda #<scrolltext
+    sta textpointer_lo
+    lda #>scrolltext
+    sta textpointer_hi
+    lda (textpointer_lo),y
+!:
+    lda (textpointer_lo),y
+    sec
+    sbc #$20                 // Convert ASCII to lookup table index
+    tax
+    lda sprite_lookup,x      // Get sprite pointer from table
+    sta $07fd               // Store in last sprite position
 
-    noreset:
-        clc
-        adc #(>spriteMemory<<2) // correct for location of sprite font
-        .break
-        sta SPRITEPOINTER+6     // store new letter in sprite 8 pointer
+    // Increment text pointer
+    inc textpointer_lo
+    bne !+
+    inc textpointer_hi
+!:
+    lda #SPRITESPACING     
+no_update:
+    sta scrollpos
 
-        inc textpointer+1      // increase scroll text pointer
-        bne !+
-        inc textpointer+2
-    !:
-        lda #SPRITESPACING     // move sprite 2 to right most position
-notext:
-    sta scrollpos+1
-
-    ldx #$00                   // position other sprites relative to sprite 1
-scrollpos:
-    lda #$18                   // set new X-coord for all sprites
+    // Position sprites and handle MSB
+    clc
+    adc #$30                // Start position
+    sta $d004               // Sprite 2 X
     clc
     adc #SPRITESPACING
-    sta $d002
+    sta $d006               // Sprite 3 X
     clc
     adc #SPRITESPACING
-    sta $d004
+    sta $d008               // Sprite 4 X
     clc
     adc #SPRITESPACING
-    sta $d006
-    clc
-    adc #SPRITESPACING
-    sta $d008
-    clc
-    adc #SPRITESPACING
-    sta $d00a
-    bcc !+
-    ldx #%11100000             // take care of MSB
-    clc
-!:  adc #SPRITESPACING
-    sta $d00c
-    bcc !+
-    ldx #%11000000
-    clc
-!:  adc #SPRITESPACING
-    sta $d00e
-    bcc !+
-    ldx #%10000000
-!:  stx $d010                 // set proper sprite MSB
+    sta $d00a               // Sprite 5 X
+    
+    // MSB handling
+    lda #0
+    adc #0                  // Get carry from last addition
+    asl                     // Shift to correct position for sprites 2-5
+    asl
+    sta $d010               // Set MSB
 
-    lda #$00                // Reset $d017 to close sideborder after usage
-    sta $d017
+    rts
 
+update_sine:
+    ldx sinpos
+    lda sindata,x          // Get Y position from sine table
+    sta $d003              // Sprite 1 (Pilli)
+    sta $d005              // Sprite 2
+    
+    txa
+    clc
+    adc #SINLEAP
+    tax
+    lda sindata,x
+    sta $d007              // Sprite 3
+    
+    txa
+    clc
+    adc #SINLEAP
+    tax
+    lda sindata,x
+    sta $d009              // Sprite 4
+    
+    txa
+    clc
+    adc #SINLEAP
+    tax
+    lda sindata,x
+    sta $d00b              // Sprite 5
+
+    inc sinpos             // Update sine offset for next frame
+    rts
 sinreset:
-    ldx #$00                  // sine wave counter
-    stx sinwave+1             // store in sine wave pointer
-    inc sinreset+1
-    ldy #$00
+    ldx #$00              
+    stx sinwave+1         
+    inc sinreset+1        
+    ldx sinreset+1        
+    
+    lda sindata,x
+    sta $d003            
+
+    txa                  
+    clc
+    adc #SINLEAP         
+    tax
+    lda sindata,x        
+    sta $d005            
+
+    txa
+    clc
+    adc #SINLEAP         
+    tax
+    lda sindata,x
+    sta $d007            
+
+    txa
+    clc
+    adc #SINLEAP         
+    tax
+    lda sindata,x
+    sta $d009            
+
+    txa
+    clc
+    adc #SINLEAP         
+    tax
+    lda sindata,x
+    sta $d00b            
+
+    rts
 sinwave:
-    lda sindata               // read sine wave data
-    sta $d001,y               // store in Y-coords sprites
+    lda sindata           
+    sta $d001,y          // Start from sprite 1 Y position
     lda sinwave+1
     clc
-    adc #SINLEAP              // to make wave more interesting
-    sta sinwave+1             // increase sine wave pointer by SINLEAP
+    adc #SINLEAP         
+    sta sinwave+1        
     iny
     iny
-    cpy #$10                  // next sprites
+    cpy #$10             // Up through sprite 7
     bne sinwave
-    jmp $ea31                 // end of IRQ1
+    rts
 
 .align $100
 sindata:
