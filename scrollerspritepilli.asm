@@ -1,11 +1,40 @@
 // Made in Kick Assembler
-.label spriteMemory = $3000
+.label screenRAM = $4000      // Move screen RAM here
+.label colorRAM = $d800       // Move color RAM here
+.label bitmapMem = $6000      // Bitmap 
+.label spriteMemory = $5000   // Move sprites
+.label MUSIC_LOAD = $1000     // New location where we want the music
+.label MUSIC_INIT = MUSIC_LOAD  // Init routine at start of music
+.label MUSIC_PLAY = MUSIC_LOAD + $03  // Play routine is at +$03
 
-* = spriteMemory // spriteMemory is where you want your sprites
+
+.const KOALA_TEMPLATE = "C64FILE, Bitmap=$0000, ScreenRam=$1f40, ColorRam=$2328, BackgroundColor = $2710" //4711 Bitmap,ScreenRam,ColorRam,BackgroundColor Files from koalapaint
+.var picture = LoadBinary("spagfinalko2.kla", KOALA_TEMPLATE)
+
+*=screenRAM "ScreenRAM";            .fill picture.getScreenRamSize(), picture.getScreenRam(i)
+*=colorRAM "ColorRAM"; colorRam:  .fill picture.getColorRamSize(), picture.getColorRam(i)
+*=bitmapMem "Bitmap";            .fill picture.getBitmapSize(), picture.getBitmap(i)
+
+
+.macro LoopKoala() {
+!loop:
+.for (var i=0; i<4; i++) {
+   lda colorRam+i*$100,x
+   sta $d800+i*$100,x
+}
+inx
+bne !loop-
+}
+
+* = spriteMemory "Sprites" // spriteMemory is where you want your sprites
 
 // Load the GIF with the sprite font, each letter in a 64x21 grid
 .var spriteFont = LoadPicture("fontt1pil.gif",List().add($ffffff,$000000))
-.var music = LoadSid("zoomakiaksi.sid")
+
+.var music = LoadBinary("zoomakiaksi.sid")
+
+*=MUSIC_LOAD "Music"
+.fill music.getSize()-126, music.get(i+126)  // Skip the PSID header
 // Create a List() that contains the letters in your font
 //  in the order as they appear in the GIF
 .var fontMap = List()
@@ -22,7 +51,7 @@
 .for (var p=0; p<fontMap.get(l).size(); p++){	// loop through letters
 
 // The location in memory is determined by the value of the letter
-* = spriteMemory + fontMap.get(l).charAt(p)*64 "Sprite" // determine memory location
+* = spriteMemory + fontMap.get(l).charAt(p)*64 "Sprites" // determine memory location
     .print "perus: " + fontMap.get(l).charAt(p)
     .print "64: " + fontMap.get(l).charAt(p)*64
     .print "p: " + p
@@ -35,8 +64,8 @@
     .const SPRITESPACING   = 43    // minimal possible spacing
     .const SINLEAP         = 20    // choose anything here to change sine wave
     .const SCROLLSPEED     = 4     // lower value is slower
-    .const SPRITEPOINTER   = $07f9
-    .const PILLIPOINTER = $07f8
+    .const SPRITEPOINTER   = screenRAM+$03f9
+    .const PILLIPOINTER = screenRAM+$03f8
     .const PILLIMEMORY = spriteMemory + fontMap.get(1).charAt(12)*64 
 
 *=$0801
@@ -46,9 +75,31 @@
     sei
     jsr $e544              // KERNAL: clear screen
 
-    lda #$00               // Set border and background to black
-    sta $d020              // Set the border color to black
-    sta $d021              // Set the background color to black
+
+    lda $dd00
+    and #%11111100
+    ora #%00000010              // Set to bank 1 ($4000-$7FFF) 
+    sta $dd00                   // %10, 2: Bank #1, $4000-$7FFF, 16384-32767.
+
+    // Set up screen and bitmap memory
+    lda #%00001000    // Screen at $4000, bitmap at $6000
+    sta $d018             //VIC bank adress+adress
+
+    // Enable bitmap mode
+    lda #$3b             // BMM=1, DEN=1, RSEL=1
+    sta $d011
+    lda #$d8             // MCM=1
+    sta $d016
+
+    // Set colors
+    lda #$00
+    sta $d020            // Border color
+    lda #picture.getBackgroundColor()
+    sta $d021            // Background color
+
+    // Initialize color data
+    ldx #$00
+    LoopKoala()          // Copy initial color data
 
 
     lda #$00               // reset sine wave pointers
@@ -61,11 +112,10 @@
     sty textpointer+2
 
     lda #$ff
-    sta $d015              // turn on all sprites
-
-    // Pillihomz
-    lda #(>PILLIMEMORY<<2)       // Load the high byte of PILLIMEMORY
-    sta PILLIPOINTER        // Store it at PILLIPOINTER
+    sta $d015            // Enable all sprites
+    // Pilli sprite
+    lda #(>PILLIMEMORY<<2)
+    sta PILLIPOINTER
     lda #$04
     sta $d027
     lda #$20
@@ -73,12 +123,12 @@
     lda #$00
     sta $d001
 
-    // MUSIX
-    lda #$00                  // Load 0 into accumulator
-    tax                       // Transfer 0 to X register
-    tay                       // Transfer 0 to Y register
-    lda #music.startSong-1    // Load the startSong-1 address into accumulator
-    jsr music.init            // Initialize music routine at $1B24
+    // MUSIX init
+    lda #$00
+    tax
+    tay
+    lda #$01            // Start song 1
+    jsr MUSIC_INIT
 
 
     ldx #$00
@@ -100,7 +150,7 @@
 
     lda #30
     sta $d012
-    lda #$1b //00011011
+    lda #$3b //now: 00111011 default: 00011011
     sta $d011
 
     ldx #<irq              // set pointers to FLD IRQ routine
@@ -115,7 +165,7 @@
 irq:
     asl $d019
 
-    jsr music.play            // Play music
+    jsr MUSIC_PLAY           // Play music
     lda scrollpos+1            // X-position of 1st sprite
     sec
     sbc #SCROLLSPEED           // decrease with SCROLLSPEED
@@ -212,31 +262,19 @@ sindata:
     .fill 256, -50 + 15.5*sin(toRadians(i*(3*360)/256))
 
 scrolltext:
-    .text "spaggession is here! this is your invitation to the real party nearby in undisclosed location! be there or be lame! fuckings to lamers and the ones who don't pay their debts!"
+    .text "stoneman and lemming are spaggession! featuring rock of finnish gold! this is a new kind of concept we figured out after stoneman had done some dealings on boozembly 2024, and a bunch of people forgot to pay their debts to him! we figure this was because of alcohol and various substances, but if you feel the sting in your conscience, you have to contact stoneman immediately! this amazing intro is a production of damaged minds. we are currently boozing and smoking and whatnot on zoo 2024, and the party is amazing! it's lemming on the keys by the way. i'd like to greet everyone especially in nostalgia!! i'll be back some day. now i just had some of the coolest chats with my old groupnamtes der piipo from orange and pal from offence (and finnish gold, of course!). so i need to go find them so they can input their thoughts into this massive production. see you again in another scroller segment! "
+    .text "Damones, soimme sydamia joimme juomia yhdessa kaljoissa pitkissa maksoissa, cheers by hoffi. spaggession is here! this is your invitation to the real party nearby in undisclosed location! be there or be lame! fuckings to lamers and the ones who don't pay their debts!"
     .byte $00
 
-*=music.location "Music"
-.fill music.size, music.getData(i)
 // Print the music info while assembling
 .print ""
 .print "SID Data"
 .print "--------"
-.print "location=$"+toHexString(music.location)
-.print "init=$"+toHexString(music.init)
-.print "play=$"+toHexString(music.play)
-.print "songs="+music.songs
-.print "startSong="+music.startSong
-.print "size=$"+toHexString(music.size)
-.print "name="+music.name
-.print "author="+music.author
-.print "copyright="+music.copyright
-
-.print ""
-.print "Additional tech data"
-.print "--------------------"
-.print "header="+music.header
-.print "header version="+music.version
-.print "flags="+toBinaryString(music.flags)
-.print "speed="+toBinaryString(music.speed)
-.print "startpage="+music.startpage
-.print "pagelength="+music.pagelength
+.print "location=$"+toHexString(MUSIC_LOAD)
+.print "init=$"+toHexString(MUSIC_INIT)
+.print "play=$"+toHexString(MUSIC_PLAY)
+.print "size=$"+toHexString(music.getSize()-126)  // Size minus header
+.print "First few bytes of music:"
+.print "Byte 0: $" + toHexString(music.get(126))
+.print "Byte 1: $" + toHexString(music.get(127))
+.print "Byte 2: $" + toHexString(music.get(128))
